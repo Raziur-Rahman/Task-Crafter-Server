@@ -24,31 +24,83 @@ const client = new MongoClient(uri, {
   }
 });
 
+// Custom middleware's
+
+const gateman = (req, res, next) => {
+  if (!req?.headers?.authorization) {
+    return res.status(401).send({ massage: "Unauthorized Access" })
+  }
+  const token = req?.headers?.authorization.split(' ')[1];
+  // console.log("token From middleware: ", token);
+  jwt.verify(token, process.env.JWT_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ massage: "Unauthorized Access" })
+
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
 
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client.db('TaskCrafterDB').collection('users');
+    const tasksCollection = client.db('TaskCrafterDB').collection('tasks');
 
     // JsonWebToken Api's
     app.post('/jwt', async (req, res) => {
-        const user = req.body;
-        const token = jwt.sign(user, process.env.JWT_TOKEN_SECRET, { expiresIn: "6hr" })
-        res.send({ token })
+      const user = req.body;
+      const token = jwt.sign(user, process.env.JWT_TOKEN_SECRET, { expiresIn: "6hr" })
+      res.send({ token })
     })
 
     // User's Api is here
 
     app.get('/users', async (req, res) => {
-        const result = await usersCollection.find().toArray();
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    })
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+
+      const query = {
+        email: user.email
+      }
+
+      const existUser = await usersCollection.findOne(query);
+      if (existUser) {
+        res.send({ massage: "User Already Exist", insertedId: null })
+      }
+      else {
+        const result = await usersCollection.insertOne(user);
         res.send(result);
+      }
+
+    })
+
+    // Task related Api's
+
+    app.post('/tasks', async (req, res) => {
+      const data = req.body;
+
+      const result = await tasksCollection.insertOne(data);
+
+      res.send(result);
+
+    })
+    app.get('/tasks', async (req, res) => {
+      const result = await tasksCollection.find().toArray();
+      res.send(result);
     })
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -58,8 +110,8 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send("Task Crafter Server is running....");
+  res.send("Task Crafter Server is running....");
 })
 app.listen(port, () => {
-    console.log("Task Crafter is Running at port: ", port)
+  console.log("Task Crafter is Running at port: ", port)
 })

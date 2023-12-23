@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 require('dotenv').config();
 const jwt = require("jsonwebtoken");
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 
 
@@ -93,8 +93,40 @@ async function run() {
       res.send(result);
 
     })
-    app.get('/tasks', async (req, res) => {
-      const result = await tasksCollection.find().toArray();
+    app.get('/tasks', gateman, async (req, res) => {
+      const email = req.decoded.email;
+      
+      const query ={
+        userEmail: email
+      }
+      const result = await tasksCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.get('/tasks/:id', gateman, async (req, res) => {
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)}
+      const result = await tasksCollection.findOne(query);
+      res.send(result);
+  })
+
+    app.patch('/tasks/:id', gateman, async (req, res) => {
+      const id = req.params.id;
+      const bodyData = req.body;
+      const filter = { _id: new ObjectId(id) };
+
+      let updatedDoc = {
+        $set: { ...bodyData }
+      };
+
+      // console.log(id, updatedDoc);
+      const result = await tasksCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    app.delete("/tasks/:id", gateman, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await tasksCollection.deleteOne(query);
       res.send(result);
     })
 
